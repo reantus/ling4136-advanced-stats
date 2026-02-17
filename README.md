@@ -15,4 +15,8 @@ This is the repository for the class "LING2136/4136 Advanced Statistical Methods
 
 -   `slides/` contains `.pdf` of in-class presentations
 
+-   `resources/` contains
+      - `bibliography.bib` file to generate references in quarto document
+      - `LLMs_shiny` which contains the shiny app to explore the relationship between random effects and false positive rates
+
 Last updated: 2026-01-22 by Timo Roettger
