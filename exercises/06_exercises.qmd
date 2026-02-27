@@ -35,7 +35,7 @@ run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocument
 run_if_not_knitting(setwd(current_working_dir))
 
 # options to increase efficiency of brms models (optional)
-options(brms.backend = "cmdstanr")
+#options(brms.backend = "cmdstanr")
 options(mc.cores = parallel::detectCores())
 
 ```
@@ -361,7 +361,7 @@ This is a table containing the samples that approximate the posterior distributi
 ```{r}
 #| label: visualize_posterior
 
-uniform_prior_mdl |> 
+wide_prior_mdl |> 
   spread_draws(b_Intercept) |> 
   ggplot(aes(x = b_Intercept)) +
   stat_halfeye(fill = 'darkorchid3')
