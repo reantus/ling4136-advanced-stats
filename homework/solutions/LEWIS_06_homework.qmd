@@ -50,7 +50,7 @@ Winter, B., & Matlock, T. (2013). Making judgments based on similarity and proxi
 
 # Load our datasets
 sim <- read_csv("../data/linguistic_similarity.csv")
-
+head(sim)
 ```
 
 In this study, they investigated the conceptual structure of the metaphor “SIMILARITY IS PROXIMITY.” They did a series of experiments in which they investigated whether participants judge entities to be closer to each other when they are thought to be more similar. They presented participants with descriptions of two cities. These cities either sounded similarly or they sounded differently (`Phon`). Moreover, the descriptions depicted the cities as either semantically similar or different (`Sem`). After reading both descriptions and seeing both names, participant had to draw into a map and had to randomly guess where these two cities are located. The authors measured the `Distance` between the two cities for each participant in millimeters.
@@ -72,7 +72,6 @@ sim %>%
 
 # Description: 
 # SemDifferent has a peak of just over 75mm and sits at a higher density (more data points), whereas SemSimilar's peak sits at just below 75mm with a lower density (fewer data points). Both distributions are right-skewed...
-
 ```
 
 # (B) Think about priors
@@ -97,7 +96,7 @@ get_prior(mdl_formula, sim)
 
 Generally, every coefficient of our model corresponds to one parameter under the class `b`, except for the `Intercept` which is its own class. So we have a prior for the `Intercept` of the linear model and a prior for the coefficient `SemSimilar`. Priors of class `b` for our predictors always receive a flat uniform prior by default if you do not specify it otherwise. The default prior for the `Intercept` is data driven and uses a student-t distributions that covers most of the data. We also have a prior for `sigma` which is the residual variance and again is by default assigned a student-t prior informed by the variance in the data.
 
-Now I want you to specify normally distributed priors which respect the following knowledge we have: Participants needed to draw the cities on a map on a piece of din-A4 paper. The furthest two points on the map where 214 mm apart.
+Now, I want you to specify normally distributed priors which respect the following knowledge we have: Participants needed to draw the cities on a map on a piece of din-A4 paper. The furthest two points on the map where 214 mm apart.
 
 Your task: First use the `plot_normal()` function to find a normal distribution that covers reasonable Distance values under the above described assumptions of the experiment.
 
@@ -119,7 +118,7 @@ Now based on your exploration, specify priors. Remember what the two coefficient
 ```{r}
 #| label: spec_priors
 
-my_priors <-c(prior(normal(90, 30), class = 'Intercept'),
+my_priors <- c(prior(normal(90, 30), class = 'Intercept'),
                  prior(normal(0, 10), class = 'b'))
 
 ```
@@ -212,7 +211,6 @@ xmdl_post |>
     geom_density() +
     facet_wrap(Sem ~ .)
 
-
 ```
 
 After seeing the data the very diffuse priors have given way to much more narrow and shifted posteriors.
@@ -223,7 +221,7 @@ We can also plot the data in an alternative way, since we are mostly interested 
 #| label: alternative_plot
 
 # We do a little wrangling to get it into a nice shape
-xmdl |> 
+xmdl_post |> 
   # first extract the samples for the differences only
   spread_draws(b_SemSimilar) |> 
   # plot
@@ -241,9 +239,9 @@ Describe whether the data (dark line) and the posterior samples (light blue line
 ```{r}
 #| label: pp_check
 
-pp_check(xmdl, ndraws = 100)
+pp_check(xmdl_post, ndraws = 100)
 
-# YOUR ASSESSMENT HERE
+# This is a massive mismatch... the dark line (data) is very flat and stable compared to the posterior samples which hike between 0 and 200. Either I've done something wrong or this is a very poorly suited model. Some values fall below 0 which is not possible. Otherwise a lot of the data is concentrated in the same place. 
 
 ```
 
@@ -254,8 +252,28 @@ Can you fix the mismatch between the observed data (dark blue line) and the simu
 ```{r}
 #| label: transform
 
-# YOUR CODE HERE
+# log transformation
+sim_l <- sim %>%
+  mutate(distance_log = log(Distance))
+sim_l
 
+# model 
+xmdl <- brm(distance_log ~ Sem,
+            family = gaussian(),
+            prior = my_priors,
+            sample_prior = "only",
+            data = sim_l,
+            seed = 42)
+
+# plot of model, differences only
+xmdl %>% 
+  spread_draws(b_SemSimilar) |> 
+  ggplot(aes(x = b_SemSimilar)) +
+    geom_density(fill = "purple") 
+
+# pp check
+pp_check(xmdl, ndraws = 100)
+#that looks worse. complete mismatch between observed and simulated data. Not a suitable model
 ```
 
 # OPTIONAL (G) specify priors that will reduce the effect of SEM to zero
