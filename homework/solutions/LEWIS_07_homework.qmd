@@ -83,7 +83,7 @@ Check which priors this model needs and specify weakly informative priors.
 
 Remember that weakly informative priors are priors that do not bias the posteriors in any direction, but reasonably constrain the parameter space, i.e. only reasonable values are assumed.
 
-For priors of class `Intercept` and `b`, constrain the parameter space with a wide normal distribution. 
+For priors of class `Intercept` and `b`, constrain the parameter space with a wide normal distribution.
 
 ```{r}
 #| label: get_prior
@@ -91,7 +91,8 @@ For priors of class `Intercept` and `b`, constrain the parameter space with a wi
 # YOUR CODE HERE
 
 # specify weakly informative priors
-my_priors <- #YOUR PRIORS HERE
+my_priors <-  c(prior(normal(6.5, 1), class = 'Intercept'),
+               prior(normal(0, 0.1), class = 'b', coef = 'log_frequency'))
 
 ```
 
@@ -120,7 +121,7 @@ my_priors <- c(my_priors,
 
 ### (B) Run model
 
-Now run the model with 4 chains, 1000 warm-up and 1000 post-warm-up samples per chain. Check that chains are reasonably mixed and that sampling yielded a sufficient effective sample size. If not address the issues appropriately (check slides again). 
+Now run the model with 4 chains, 1000 warm-up and 1000 post-warm-up samples per chain. Check that chains are reasonably mixed and that sampling yielded a sufficient effective sample size. If not address the issues appropriately (check slides again).
 
 ```{r}
 #| label: model_quant
@@ -131,16 +132,47 @@ Now run the model with 4 chains, 1000 warm-up and 1000 post-warm-up samples per 
 #                        "05","06","07","08"))
 
 # YOUR CODE HERE
+# model
+xmdl <- brm(log_rt ~ log_frequency,
+            family = gaussian(),
+            file = "../models/05_wide_prior_mdl.rds",
+            prior = my_priors,
+            data = quantese,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 42)
+summary(xmdl)
 
+#view it 
+mcmc_plot(xmdl, type = "trace")
 ```
 
 ### (C) Plot posterior predictions
 
-Find a way to extract posterior samples from the model for the `Intercept` and the `log_frequency` coefficient and plot the predicted posterior mean linear model alongside its 95% Credible Intervals. There are many different ways to get there. 
+Find a way to extract posterior samples from the model for the `Intercept` and the `log_frequency` coefficient and plot the predicted posterior mean linear model alongside its 95% Credible Intervals. There are many different ways to get there.
 
 ```{r}
 #| label: plot_predictions
 
 # YOUR CODE HERE
-
+library(tidybayes)
+# plot
+plot <- xmdl %>%
+spread_draws(b_Intercept, sigma) %>% 
+  # Create two columns that represent the two categories
+  mutate(intercept = b_Intercept,
+         prediction = b_Intercept + sigma) %>% 
+  # and then bring into a long format like the data
+  select(intercept, prediction) %>% 
+  pivot_longer(everything(), names_to = "log_frequency", values_to = "log_rt") %>% 
+  # plot
+  ggplot(aes(x = log_rt, fill = log_frequency)) +
+    geom_density(alpha = 0.5) +
+  stat_pointinterval(aes(y = 0.05), .width = 0.95) +
+  ylim(0, 0.2) +
+  labs(y = 'prediction')
+plot
 ```
