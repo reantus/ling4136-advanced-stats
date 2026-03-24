@@ -1,0 +1,247 @@
+---
+title: "session09 - exercises"
+format: html
+editor: visual
+date: 2025-07-17
+author: Timo Roettger
+execute:
+  error: false
+  warning: false
+  message: false
+  cache: false
+bibliography: ../resources/bibliography.bib
+---
+
+# Preamble: Loading packages and configuration
+
+```{r}
+#| label: data_and_libraries
+#| echo: false
+
+# just run this code chunk
+# function to ignoring the setting of the relative path below when knitting
+run_if_not_knitting <- function(expr) {
+  if (!isTRUE(getOption("knitr.in.progress"))) {
+    eval(expr)
+  }
+}
+
+# nifty code using the pacman package
+# it checks if the packages specified below are installed, if not, they will be installed, if yes, they will be loaded
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(rstudioapi, tidyverse, lme4)
+
+# set the current working directory to the one where this file is
+run_if_not_knitting(current_working_dir <- dirname(rstudioapi::getActiveDocumentContext()$path))
+run_if_not_knitting(setwd(current_working_dir))
+
+```
+
+# Introduction
+
+The main **learning goals** of this week's practical parts are:
+
+-   getting an intuition about the gap between verbal hypotheses and formal hypotheses
+
+# The data
+
+In this dataset, we will be analyzing data from @kilpatrick2023random:
+
+In a nutshell, the authors were interested in whether there is a relationship between the form of a word and its meaning by looking at Japanese Pokemon names.
+
+Let's have a look at the data:
+
+```{r}
+#| label: data
+
+# Load in the dataset and already remove irrelevant stuff:
+pokemon <- read_csv('../data/Japanese_Pokemon_simplified.csv') |> 
+  select(-`Sum of values`, -Checksum)
+
+# check data set:
+pokemon
+
+```
+
+What you see here are the following variables:
+
+Variables:
+
+`Designation`: source of Pokemon name. Official = the official names of Japanese Pokemon; Elicited = elicited names from naive participants.
+
+(`pokemonname`: Pokemon name in Japanese) removed in simplified data file
+
+`Output`: Pokemon name in transcribed form
+
+`Length`: Amount of phones in name
+
+`Evolution`: Evolution stage of Pokemons: 1 = pre-evolution; 2 = post-evolution, NA = do not evolve
+
+`f` = amount of /f/ sounds in name
+
+`T` = amount of /T/ sounds in name
+
+...
+
+and many more different sounds.
+
+Now imagine researchers want to use this data set to *test* the following hypothesis:
+
+*The evolution stage of a Pokemon is reflected in aspects of its Japanese name*
+
+# Exercise
+
+## A: Preregister your analysis
+
+Take the hypothesis and what you know about the data set and its structure to predict a very specific relationship that you can test. You are allowed to look at the dataset, but do not look at concrete relationships that might be a manifestation of the hypothesis.
+
+### Specific relationship to investigate
+
+*An increase in evolution stage of Pokemon corresponds with a higher likelihood of having /n/(s) in the name.*
+
+## B: Run your preregistered analysis
+
+Run the preregistered analysis made in (A) above and interpret your results relative to the hypothesis.
+
+```{r}
+# ANALYSIS
+library(brms)
+# specify model formula
+mdl_formula = bf(Evolution ~ n) 
+# get priors
+get_prior(mdl_formula, pokemon)
+# set priors
+my_priors <- c(prior(normal(2, 2.5), class = 'Intercept'),
+               prior(normal(0, 2.5), class = 'sigma'))
+
+# running analysis
+xmdl <- brm(mdl_formula,
+            family = gaussian(),
+            prior = my_priors,
+            data = pokemon,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 42)
+summary(xmdl)
+
+# INTERPRETATION
+# INTERCEPT: 1.51, average predicted Evolution stage without the presence of an n, with a 95%CrI between 1.49 and 1.54, very concentrated data. 
+
+# n: -0.04, with each unit of increase in the Intercept, the presence of an n goes down by 0.04, 95%CrI between -0.1 and 0.03, also very concentrated. 
+
+# NO CONCERNS: Rhats are good, Bulk_ESS and Tail_ESS are high
+
+# VERDICT: data contradicts the hypothesis, weak negative relationship. the chances of not having an n in the pokemon name are pretty equal between 1 and 2, and there is a slight decrease in the probability of having an n in the name as the Evolution stage increases. Higher evolution stages do not correspond with the presence of more n in the pokemon name. 
+```
+
+## C: Show contradicting results
+
+Now explore the data and find two alternative way to test the research hypothesis that yield convincing results that go in opposite directions based of your findings in (A). Justify all your choices verbally after the fact.
+
+```{r}
+# OPTION 1: adding Length as an interaction term
+# new model formula
+mdl_formula2 = bf(Evolution ~ n * Length)
+# get priors
+get_prior(mdl_formula2, pokemon)
+# set priors
+my_priors2 <- c(prior(normal(2, 2.5), class = 'Intercept'),
+               prior(normal(0, 2.5), class = 'sigma'))
+# run model
+xmdl2 <- brm(mdl_formula2,
+            family = gaussian(),
+            prior = my_priors2,
+            data = pokemon,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 42)
+summary(xmdl2)
+
+# INTERPRETATION
+# INTERCEPT: 0.9, average Evolution stage of a Pokemon with no n and base length, 95%CrI between 0.8 and 1
+
+# n: 0.02, with each unit of increase in Evolution stage, presence of an n increases by 0.02, 95%CrI between -0.22 and 0.26
+
+# Length: 0.08, with each unit of increase in Evolution stage, Length increases by 0.08 units
+
+# n:Length : -0.01, intereaction term, difference of differences 
+
+# VERDICT: weakly positive evidence to support the hypothesis, n is a better predictor for evolution stage when interacting with Length, Evolution stage of a Pokemon with no n is closer to pre-evolution with both n-presence and Length increasing slightly as the evolution stage approaches 2 or post-evolution
+
+# NO CONCERNS: Rhats are good, Bulk_ESS and Tail_ESS are high
+
+# JUSTIFICATION: 
+#addition of interaction with Length based on assumption that the increased presence of an /n/ is due to an addition on the name which would increase overall name length (assuming i had not seen previous analysis). 
+
+### 
+
+# OPTION 2: add Length as a random intercept 
+# formula 
+mdl_formula3 <- bf(Evolution ~ n +
+                  (1 | Length)) 
+# get and set priors
+get_prior(mdl_formula3, pokemon)
+my_priors3 <- c(prior(normal(2, 2.5), class = 'Intercept'),
+               prior(normal(0, 2.5), class = 'sigma'))
+# model
+xmdl3 <- brm(mdl_formula3,
+            family = gaussian(),
+            prior = my_priors3,
+            data = pokemon,
+            chains = 4,
+            cores = 4, 
+            iter = 2000,
+            warmup = 1000,
+            thin = 1,
+            seed = 42)
+summary(xmdl3)
+
+# INTERPRETATION
+# INTERCEPT: 1.58, average Evolution stage of a Pokemon with no n, closer lean towards 2 than first analysis, 95%CrI between 1.45 and 1.74, data concentrated over a slightly broader area
+
+# n: -0.09, with each unit of increase in Evolution stage, presence of an n decreases by 0.09, 95%CrI between -0.16 and -0.03, wider spread of data
+
+# NO CONCERNS: Bulk_ESS and Tail_ESS are high
+
+# CONCERN: Rhat for regression coefficient of the Intercept is 1.01, which is right on the threshold of questionable i think. chains may not have mixed well, so i will check that
+mcmc_plot(xmdl3, type = "trace")
+# no divergences but there are a few spots that look a bit uneven in b_Intercept and sd_Length_Intercept, and perhaps estimates between chains do not agree
+
+# VERDICT: also a rather weak negative relationship, much like the initial analysis. however, due to Rhat of the Intercept, I would be hesitant to accept a similar verdict to the initial analysis. a bit unsure of this one
+
+# JUSTIFICATION: 
+# longer names have a higher baseline probability of containing /n/ (any given phoneme really) 
+```
+
+## D: Researcher degrees of freedom
+
+Note down all dimensions of researcher degrees of freedom that make the mapping of the hypothesis onto your data analysis vague. How many possible combinations can you think of?
+
+### Declared degrees of freedom
+
+-   Presence of an /n/ is vague and doesn't consider:
+
+    -   phoneme position
+
+    -   whether it is in a stressed or unstressed syllable
+
+    -   phoneme count
+
+    -   the issue of possible assimilation into /ŋ/ in pronunciation
+
+-   Also does not consider differences between the presence of a grapheme and the presence of a phoneme
+
+-   Is Pokemon evolution linear? Is it on an ordinal scale/categorical? Should it be treated like a series of continuous variables?
+
+# References
+
+<!-- References will auto-populate in the refs div below -->
+
+::: {#refs}
+:::
