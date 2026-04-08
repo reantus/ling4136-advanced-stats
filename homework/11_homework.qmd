@@ -106,7 +106,7 @@ my_priors <- c(prior(normal(150,50), class = 'Intercept'),
 xmdl <- brm(mdl_formula,
             family = gaussian(),
             prior = my_priors,
-            file = "../../models/in_sesoi",
+            file = "../models/in_sesoi",
             data = incNeutr,
             seed = 42)
 
@@ -115,7 +115,7 @@ xmdl_prior <- brm(mdl_formula,
             family = gaussian(),
             prior = my_priors,
             sample_prior = "only",
-            file = "../../models/in_sesoi_priors",
+            file = "../models/in_sesoi_priors",
             data = incNeutr,
             seed = 42)
 
