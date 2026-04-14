@@ -130,7 +130,37 @@ Explore the posterior distribution for the difference between voiced and voicele
 ```{r}
 
 # YOUR ANSWERS HERE
+summary(xmdl)
 
+posteriors <- 
+  xmdl %>% 
+  spread_draws(b_Intercept, b_voicingvoiceless) %>%  
+  mutate(voicingvoiced = b_Intercept,
+         voicingvoiceless = b_Intercept + b_voicingvoiceless) %>%  
+  select(voicingvoiced, voicingvoiceless) %>%  
+  pivot_longer(everything(),
+               names_to = "Condition",
+               values_to = "vowel_dur") 
+
+# plot
+posteriors %>%  
+  ggplot(aes(x = vowel_dur,
+             fill = Condition)) +
+    geom_density() +
+    labs(x = "Posterior estimates for vowel duration in milliseconds") +
+    facet_wrap(~Condition, ncol = 1) +
+    scale_fill_manual(values = c("purple", "orange"))
+
+#INTERPRETATION
+# Very clear overlap, though the posterior distributions do have different peaks. Either the two conditions are not meaningfully different or the difference is very very minimal. Will check parameter difference
+
+xmdl %>%
+  spread_draws(b_voicingvoiceless) %>% 
+  ggplot(aes(x = b_voicingvoiceless)) +
+    stat_halfeye() +
+    labs(x = "Posterior estimates for mean difference between conditions")
+
+# distribution is almost entirely negative  
 ```
 
 ## (b) Define a SESOI
@@ -140,7 +170,20 @@ Define a SESOI and justify it. Can you find an applied justification for a SESOI
 ```{r}
 
 # YOUR ANSWER HERE
+#SESOI would be 20. As a ROPE: 
+rope <- c(-20, 20)
 
+# JUSTIFICATION: I would define a ROPE of [−20 ms, +20 ms], based on the my SESOI of 20ms because it is my understanding that 20ms is a generally accepted perceptual JND for vowel duration. I don't think that an imperceptible difference between conditions would be meaningful.
+
+bayesfactor_rope(posterior = xmdl,
+                   null = rope,
+                   parameter = "b_voicingvoiceless")
+# this will not run 
+
+bayesfactor_rope(posterior = xmdl_prior,
+                   null = rope,
+                   parameter = "b_voicingvoiceless")
+# this one will. unsure what this means but the BF: 1.00 which is an ambiguous result. I think this still makes sense given that a look at the data does reveal that there is a lot of overlap between the two conditions. Would not make definitive claims with this 
 ```
 
 ## (c) Check robustness of your analysis
@@ -150,7 +193,48 @@ How robust is your conclusion against different prior choices?
 ```{r}
 
 # YOUR ANSWER HERE
+# set narrow priors
+priors_narrow <- c(prior(normal(150, 50), class = 'Intercept'),
+               prior(normal(0, 15), class = 'b', coef = 'voicingvoiceless'))
+               
 
+# run narrow prior model
+xmdl_narrow <- brm(mdl_formula,
+            family = gaussian(),
+            prior = priors_narrow,
+            file = "../models/in_sesoi",
+            data = incNeutr,
+            seed = 42)
+
+#calculate BF
+bayesfactor_rope(posterior = xmdl_narrow,
+                 prior = xmdl_prior,
+                 null = rope,
+                 parameter = "b_voicingvoiceless")
+
+# BF: 8.88e-05, extreme evidence in favour of no effect/null hypothesis
+
+#set wide priors
+priors_wide <- c(prior(normal(150, 50), class = 'Intercept'),
+               prior(normal(0, 100), class = 'b', coef = 'voicingvoiceless'))
+
+# run wide prior model 
+xmdl_wide <- brm(mdl_formula,
+            family = gaussian(),
+            prior = priors_wide,
+            file = "../models/in_sesoi",
+            data = incNeutr,
+            seed = 42)
+
+#calculate BF
+bayesfactor_rope(posterior = xmdl_wide,
+                 prior = xmdl_prior,
+                 null = rope,
+                 parameter = "b_voicingvoiceless")
+
+# BF:  8.88e-05, extreme evidence in favour of no effect/null hypothesis
+
+# Could definitely make definitive claims in favour of there being no meaningful difference in vowel duration between the voiced and voiceless conditions. 
 ```
 
 # References
